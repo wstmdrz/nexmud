@@ -1,0 +1,18 @@
+[package]
+name = "world-daemon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+tonic = { workspace = true }
+prost = { workspace = true }
+encoding_rs = "0.8" # 用于 GBK 编码转换
+# --- 为 Phase 0 Demo 增加以下依赖 ---
+tonic-reflection = "0.12"            # gRPC 反射支持
+tokio-stream = { version = "0.1", features = ["sync"] } # 流辅助工具
+futures-core = "0.3"                 # 异步流核心
+
+# 新增以下内容
+[build-dependencies]
+tonic-build = "0.12"

@@ -1,0 +1,18 @@
+syntax = "proto3";
+package broker;
+
+// Broker 主进程提供的服务
+service BrokerService {
+  // 子进程启动完毕后向主进程注册
+  rpc RegisterDaemon (DaemonInfo) returns (RegisterAck);
+}
+
+message DaemonInfo {
+  int32 pid = 1;
+  int32 grpc_port = 2;
+  string world_id = 3;
+}
+
+message RegisterAck {
+  bool success = 1;
+}

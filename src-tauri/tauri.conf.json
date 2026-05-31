@@ -1,0 +1,30 @@
+{
+    "productName": "NexMUD",
+    "version": "0.1.0",
+    "identifier": "com.nexmud.app",
+    "build": {
+        "beforeDevCommand": "pnpm ui:dev",
+        "devUrl": "http://localhost:1420",
+        "beforeBuildCommand": "pnpm ui:build",
+        "frontendDist": "../dist"
+    },
+    "app": {
+        "windows": [
+            {
+                "title": "NexMUD Broker",
+                "width": 1024,
+                "height": 768
+            }
+        ],
+        "security": {
+            "csp": null
+        }
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "externalBin": [
+            "binaries/world-daemon"
+        ]
+    }
+}

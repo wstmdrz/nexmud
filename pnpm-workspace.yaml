@@ -1,0 +1,5 @@
+packages:
+  - 'src-tauri'
+  - 'tools/*'
+allowBuilds:
+  esbuild: true

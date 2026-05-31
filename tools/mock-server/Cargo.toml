@@ -1,0 +1,9 @@
+[package]
+name = "mock-server"
+version = "0.1.0"
+edition = "2024"
+workspace = "../../src-tauri"  # <--- 增加这一行，手动给 Cargo 指向根节点
+
+[dependencies]
+tokio = { workspace = true }
+encoding_rs = "0.8" # 同样需要模拟 GBK 环境

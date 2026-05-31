@@ -1,0 +1,22 @@
+{
+  "name": "nexmud",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "ui:dev": "vite",
+    "ui:build": "vite build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.11.0",
+    "ansi-to-react": "^6.2.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "^5.2.0",
+    "vite": "^5.2.0"
+  }
+}

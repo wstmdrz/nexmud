@@ -1,0 +1,11 @@
+# 拦截所有层级下的 target 和 node_modules 目录（前后端通杀）
+**/target/
+**/node_modules/
+**/dist/
+
+# 拦截日志与本地配置
+*.log
+.env
+*.local
+.vscode/
+.idea/

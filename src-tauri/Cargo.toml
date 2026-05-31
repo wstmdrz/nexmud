@@ -1,0 +1,28 @@
+[workspace]
+members = [
+    ".",
+    "src/world-daemon",
+    "../tools/mock-server" # 新增这行
+]
+resolver = "2"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+tonic = { version = "0.12" }
+prost = { version = "0.13" }
+
+[package]
+name = "nexmud-broker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+tonic = { workspace = true }
+prost = { workspace = true }
+tauri = { version = "2.0.0", features = [] }
+tauri-plugin-shell = "2.0.0"    # 强制让插件版本与核心一致！
+
+[build-dependencies]
+tonic-build = "0.12"
+tauri-build = { version = "2.0.0", features = [] }

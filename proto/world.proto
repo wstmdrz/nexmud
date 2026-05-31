@@ -1,0 +1,27 @@
+syntax = "proto3";
+package world;
+
+// World Daemon 子进程提供的服务
+service WorldService {
+  // 发送用户输入到 MUD 服务器
+  rpc SendCommand (CommandReq) returns (CommandAck);
+  // 订阅 MUD 输出文本流
+  rpc StreamOutput (StreamReq) returns (stream OutputChunk);
+}
+
+message CommandReq {
+  string input = 1;
+}
+
+message CommandAck {
+  bool success = 1;
+}
+
+message StreamReq {
+  string session_id = 1;
+}
+
+message OutputChunk {
+  string text = 1;
+  bool has_ansi = 2;
+}
