@@ -2013,6 +2013,7 @@ name = "nexmud-broker"
 version = "0.1.0"
 dependencies = [
  "prost",
+ "serde",
  "tauri",
  "tauri-build",
  "tauri-plugin-shell",
