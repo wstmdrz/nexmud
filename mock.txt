@@ -1,0 +1,1 @@
+cargo run --manifest-path src-tauri/Cargo.toml --bin mock_server

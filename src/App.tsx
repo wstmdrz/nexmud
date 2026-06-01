@@ -1,71 +1,109 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
-import Ansi from 'ansi-to-react';
+import { Terminal } from 'xterm';
+import { WebglAddon } from 'xterm-addon-webgl';
+import { FitAddon } from 'xterm-addon-fit';
 
-// 定义支持的多标签页
+// 必须手动引入 xterm 的基础样式（Tauri 会自动打包）
+import 'xterm/css/xterm.css';
+
 const TABS = ["World-A", "World-B", "World-C"];
 
 function App() {
-  // 全局维护 3 个独立标签页的日志流缓存
-  const [tabLogs, setTabLogs] = useState<Record<string, string[]>>({
-    "World-A": ["[系统] 欢迎来到 NexMUD 终端 A..."],
-    "World-B": ["[系统] 欢迎来到 NexMUD 终端 B..."],
-    "World-C": ["[系统] 欢迎来到 NexMUD 终端 C..."],
-  });
-
-  // 当前处于哪一个活跃标签页
   const [activeTab, setActiveTab] = useState<string>("World-A");
   const [input, setInput] = useState('');
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  // 🌟【核心黑科技】：为 3 个独立的隔离世界分别创建专属的 Xterm 终端实例与自适应插件
+  const terminalRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const terminals = useRef<Record<string, Terminal>>({});
+  const fitAddons = useRef<Record<string, FitAddon>>({});
 
-  // 只要切换标签页或有新日志，就平滑滚动到底部
+  // 1. 初始化 3 个独立的终端画布
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [tabLogs, activeTab]);
+    TABS.forEach((tabId) => {
+      // 创建终端配置（支持全色彩、平滑滚动、等宽字体）
+      const term = new Terminal({
+        allowProposedApi: true,
+        scrollback: 5000, // 限制滚动历史缓冲区，防止无限白嫖内存
+        fontSize: 15,
+        fontFamily: 'Courier New, monospace',
+        theme: {
+          background: '#000000',
+          foreground: '#ffffff',
+          cursor: '#00ff00',
+        },
+        convertEol: true, // 自动把 \n 转换为 \r\n，防止错行
+      });
 
-  // 🌟【修复点 1】：组件加载时，干净地对 3 个标签页发起独立多进程拉起请求
+      const fitAddon = new FitAddon();
+      term.loadAddon(fitAddon);
+
+      terminals.current[tabId] = term;
+      fitAddons.current[tabId] = fitAddon;
+    });
+
+    // 组件卸载时释放内存
+    return () => {
+      TABS.forEach((tabId) => {
+        terminals.current[tabId]?.dispose();
+      });
+    };
+  }, []);
+
+  // 2. 当切换标签页或者容器渲染就绪时，把 Terminal 挂载到真实的 DOM 节点上
+  useEffect(() => {
+    TABS.forEach((tabId) => {
+      const container = terminalRefs.current[tabId];
+      const term = terminals.current[tabId];
+      const fitAddon = fitAddons.current[tabId];
+
+      if (container && term && !term.element) {
+        term.open(container);
+        fitAddon.fit();
+
+        // 🚀【WebGL 硬件加速】：尝试开启 WebGL 渲染，若不支持则优雅降级为 Canvas 渲染
+        try {
+          term.loadAddon(new WebglAddon());
+          term.write("\x1b[32m[母舰] ⚡ WebGL 硬件加速引擎已成功挂载。\x1b[0m\r\n");
+        } catch (e) {
+          term.write("\x1b[33m[母舰] ⚠️ 硬件加速挂载失败，已平滑降级为标准 Canvas 渲染。\x1b[0m\r\n");
+        }
+
+        term.write(`\x1b[36m[系统] 欢迎来到 NexMUD 虚拟终端 ${tabId}...\x1b[0m\r\n`);
+      }
+    });
+  }, [activeTab]);
+
+  // 3. 多沙盒初始化唤醒
   useEffect(() => {
     const bootSequence = async () => {
-      // 循环顺序拉起 A, B, C 三个独立的子进程沙箱
       for (const tabId of TABS) {
         try {
-          setTabLogs(prev => ({
-            ...prev,
-            [tabId]: [...prev[tabId], `[系统] 正在请求母舰孵化隔离域 ${tabId} 的守护进程...`]
-          }));
-
-          // 🔥【终极纠正】：纯净命令名 + 对象传参 (对齐重构后的驼峰命名法)
+          terminals.current[tabId]?.write(`[母舰] 正在请求孵化隔离域 ${tabId} 的守护进程...\r\n`);
           await invoke('init_connection', { tabId: tabId });
-
         } catch (err) {
-          setTabLogs(prev => ({
-            ...prev,
-            [tabId]: [...prev[tabId], `\x1b[31m[系统] 神经连接创建失败: ${err}\x1b[0m`]
-          }));
+          terminals.current[tabId]?.write(`\x1b[31m[系统] 神经连接创建失败: ${err}\x1b[0m\r\n`);
         }
       }
     };
-
     bootSequence();
   }, []);
 
-  // 🌟【修复点 2】：监听母舰的全局事件广播
+  // 4. 🌟【精准对齐】：接收后端的 gRPC 数据包，直接用二进制高性能流写入对应的 Terminal
   useEffect(() => {
-    // 声明接收的 Payload 结构
     interface ServerPayload {
       tabId: string;
       text: string;
     }
+
     const unlisten = listen<ServerPayload>('mud-stream-event', (event) => {
       const { tabId, text } = event.payload;
-
-      // 100% 精准分发到各自世界的独立缓存，绝不张冠李戴
-      setTabLogs((prev) => ({
-        ...prev,
-        [tabId]: [...(prev[tabId] || []), text]
-      }));
+      const term = terminals.current[tabId];
+      if (term) {
+        // xterm.js 内部天然支持标准的 ANSI 颜色代码（如 \x1b[31m），直接高速写入，无缝渲染颜色
+        term.write(text);
+      }
     });
 
     return () => {
@@ -73,50 +111,50 @@ function App() {
     };
   }, []);
 
-
-  // 🌟【修复点 3】：定向路由指令发送（完美应对验收指标）
+  // 5. 玩家指令处理
   const handleSend = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && input.trim() !== '') {
       const cmd = input.trim();
       setInput('');
 
-      // 仅在本尊活跃的标签页回显指令
-      setTabLogs((prev) => ({
-        ...prev,
-        [activeTab]: [...prev[activeTab], `\x1b[33m> ${cmd}\x1b[0m`]
-      }));
+      // 在对应的 Xterm 终端本地回显，给予标志性的黄色
+      terminals.current[activeTab]?.write(`\x1b[33m> ${cmd}\x1b[0m\r\n`);
 
       try {
-        // 🔥【终极纠正】：向后端明确发射当前的 tabId 与命令内容
-        // 这样后端 clients 注册表才能精准通过 tabId 定向投递给对应的 PID 子进程！
         await invoke('send_command', { tabId: activeTab, input: cmd });
       } catch (err) {
-        console.error("发送指令失败:", err);
-        setTabLogs((prev) => ({
-          ...prev,
-          [activeTab]: [...prev[activeTab], `\x1b[31m[系统] 指令路由发送失败: ${err}\x1b[0m`]
-        }));
+        terminals.current[activeTab]?.write(`\x1b[31m[系统] 指令路由发送失败: ${err}\x1b[0m\r\n`);
       }
     }
   };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#000', color: '#fff', fontFamily: 'monospace', fontSize: '15px' }}>
+  // 窗口大小改变时，自适应调整 Canvas 画布分辨率
+  useEffect(() => {
+    const handleResize = () => {
+      TABS.forEach((tabId) => {
+        fitAddons.current[tabId]?.fit();
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-      {/* ===== 顶部极客风标签页切换区 (满足点击 3 次创建切换验收指标) ===== */}
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#000', color: '#fff', fontFamily: 'monospace' }}>
+
+      {/* ===== 顶部标签切换区 ===== */}
       <div style={{ display: 'flex', backgroundColor: '#1a1a1a', borderBottom: '1px solid #333' }}>
         {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
-              padding: '10px 24px',
+              padding: '12px 24px',
               backgroundColor: activeTab === tab ? '#000' : 'transparent',
               color: activeTab === tab ? '#00FF00' : '#888',
               border: 'none',
               borderRight: '1px solid #333',
               cursor: 'pointer',
-              fontFamily: 'monospace',
               fontSize: '14px',
               fontWeight: activeTab === tab ? 'bold' : 'normal',
               outline: 'none'
@@ -125,19 +163,27 @@ function App() {
             🛰️ {tab}
           </button>
         ))}
-        <div style={{ flex: 1, textAlign: 'right', padding: '10px', color: '#555', fontSize: '12px' }}>
-          NexMUD Core Multi-Sandbox Monitor
+        <div style={{ flex: 1, textAlign: 'right', padding: '12px', color: '#555', fontSize: '12px' }}>
+          NexMUD WebGL Terminal Engine Pro
         </div>
       </div>
 
-      {/* ===== 终端当前标签日志显示区 ===== */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-        {(tabLogs[activeTab] || []).map((log, index) => (
-          <div key={index} style={{ whiteSpace: 'pre-wrap', marginBottom: '2px', wordBreak: 'break-word', lineHeight: '1.4' }}>
-            <Ansi useClasses={false}>{log}</Ansi>
-          </div>
+      {/* ===== 终端画布区（利用 display 隐藏非活跃画布，保持后台 Xterm 实例持续吞吐数据） ===== */}
+      <div style={{ flex: 1, position: 'relative', backgroundColor: '#000', padding: '8px' }}>
+        {TABS.map((tabId) => (
+          <div
+            key={tabId}
+            ref={(el) => { terminalRefs.current[tabId] = el; }}
+            style={{
+              display: activeTab === tabId ? 'block' : 'none',
+              position: 'absolute',
+              top: '8px',
+              left: '8px',
+              right: '8px',
+              bottom: '8px'
+            }}
+          />
         ))}
-        <div ref={bottomRef} />
       </div>
 
       {/* ===== 底部输入区 ===== */}
@@ -154,8 +200,8 @@ function App() {
             border: 'none',
             color: '#fff',
             outline: 'none',
-            fontFamily: 'monospace',
-            fontSize: '16px'
+            fontSize: '16px',
+            fontFamily: 'Courier New, monospace'
           }}
           autoFocus
           placeholder={`在 ${activeTab} 中输入指令，回车定向投递...`}

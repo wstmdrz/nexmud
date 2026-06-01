@@ -12,6 +12,10 @@ encoding_rs = "0.8" # 用于 GBK 编码转换
 tonic-reflection = "0.12"            # gRPC 反射支持
 tokio-stream = { version = "0.1", features = ["sync"] } # 流辅助工具
 futures-core = "0.3"                 # 异步流核心
+# 🟢【核心修复点 3】：子进程完全对齐继承工作空间，彻底摧毁 links 冲突！
+mlua = { workspace = true }
+regex = "1.12.3"
+flate2 = "1.1.9"
 
 # 新增以下内容
 [build-dependencies]
